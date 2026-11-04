@@ -155,3 +155,12 @@ test("the HTML header rule keeps the browser-facing Cache-Control at private, no
   assert.equal(rule.ActionParameter1, "private, no-store");
   assert.deepEqual(rule.Triggers[0], htmlNoCacheRule().Triggers[0], "same trigger as the cache-time rule");
 });
+
+test("the installer spells the public-host header the way the router does", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { PUBLIC_HOST_HEADER } = await import("../../core/constants.mjs");
+  const installer = readFileSync(new URL("../install.mjs", import.meta.url), "utf8");
+  const match = installer.match(/PUBLIC_HOST_HEADER_NAME = "([^"]+)"/);
+  assert.ok(match, "install.mjs must declare PUBLIC_HOST_HEADER_NAME");
+  assert.equal(match[1].toLowerCase(), PUBLIC_HOST_HEADER);
+});

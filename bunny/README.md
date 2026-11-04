@@ -3,7 +3,7 @@
 Install NORG's edge-mirroring router on **your own** bunny.net pull zone.
 Everything runs in your Bunny account; NORG never receives your credentials.
 
-This is the Bunny port of the Cloudflare Worker in the root of this repo. The
+This is the Bunny port of NORG's Cloudflare Worker. The
 runtime is Deno 2.7 on V8, with standard `Request`/`Response`, a real `fetch`,
 `AbortSignal.timeout`, `Bunny.v1.waitUntil` and a 128 MB heap — so the whole of
 `core/` runs here **unchanged**, and this port is three small adapters plus a

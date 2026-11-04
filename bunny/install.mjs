@@ -25,7 +25,12 @@
  *     cached and the client-facing Cache-Control untouched. It then probes the
  *     origin and reports its Cache-Control so the operator sees what the rule
  *     has to override. See the README, "The cache is the hazard".
- *  5. Attaches the customer-facing hostname and turns on AutoSSL.
+ *  5. Attaches the customer-facing hostname and turns on AutoSSL, and adds an
+ *     edge rule that names that hostname to the origin in
+ *     `X-Norg-Public-Host`. Passthrough is Bunny's own origin fetch, which
+ *     sends the pull zone's OriginHostHeader, so without this a host-aware
+ *     origin (a sitemap, a canonical link) builds every URL on the origin
+ *     domain.
  *
  * NOT VERIFIED LIVE. The HTML-only rule is written from Bunny's edge-rule
  * API; whether `OverrideCacheTime` 0 on a response-header trigger disables
@@ -52,6 +57,9 @@
 import { pathToFileURL } from "node:url";
 
 const API = "https://api.bunny.net";
+// Header-name form of core/constants.mjs PUBLIC_HOST_HEADER; the installer
+// has no build step, so the value is spelled out here and checked by a test.
+const PUBLIC_HOST_HEADER_NAME = "X-Norg-Public-Host";
 
 const REQUIRED = ["BUNNY_API_KEY", "SITE_ID", "NORG_SITE_KEY", "ORIGIN_URL", "PULL_ZONE_NAME"];
 
@@ -313,6 +321,36 @@ async function configurePullZone(zone, scriptId, originUrl) {
 }
 
 /**
+ * Name the public hostname to the origin on every request.
+ *
+ * Passthrough is Bunny's own fetch, sending the pull zone's OriginHostHeader,
+ * so the router cannot add this itself the way the Fastly and CloudFront ports
+ * do. An edge rule sets it instead. The rule is keyed by its header name so a
+ * re-run updates the existing rule rather than stacking a duplicate.
+ *
+ * @param {Object} zone Pull zone record.
+ * @param {string} hostname The customer-facing hostname this zone serves.
+ * @returns {Promise<void>} Resolves once the rule exists.
+ */
+async function tellOriginPublicHost(zone, hostname) {
+  const current = await api("GET", `/pullzone/${zone.Id}`);
+  const existing = (current.EdgeRules || []).find(
+    (rule) => rule.ActionParameter1 === PUBLIC_HOST_HEADER_NAME,
+  );
+  await api("POST", `/pullzone/${zone.Id}/edgerules/addOrUpdate`, {
+    ...(existing ? { Guid: existing.Guid } : {}),
+    ActionType: "SetRequestHeader",
+    ActionParameter1: PUBLIC_HOST_HEADER_NAME,
+    ActionParameter2: hostname,
+    Description: "NORG: tell the origin which public hostname this zone serves",
+    Enabled: true,
+    TriggerMatchingType: 0,
+    Triggers: [{ Type: "Url", PatternMatches: ["*"], PatternMatchingType: 0 }],
+  });
+  console.log(`  edge rule: origin is told the public host ${hostname}`);
+}
+
+/**
  * Report whether the origin's own HTML would be cached by Bunny.
  *
  * This is the single most important thing to know about a Bunny install and it
@@ -409,7 +447,10 @@ async function main() {
   let zone = await ensurePullZone(process.env.PULL_ZONE_NAME, process.env.ORIGIN_URL);
   await configurePullZone(zone, script.Id, process.env.ORIGIN_URL);
   await warnIfOriginIsCacheable(process.env.ORIGIN_URL);
-  if (process.env.EDGE_HOSTNAME) await ensureHostname(zone, process.env.EDGE_HOSTNAME);
+  if (process.env.EDGE_HOSTNAME) {
+    await ensureHostname(zone, process.env.EDGE_HOSTNAME);
+    await tellOriginPublicHost(zone, process.env.EDGE_HOSTNAME);
+  }
 
   zone = await api("GET", `/pullzone/${zone.Id}`);
   const system = (zone.Hostnames || []).find((h) => h.IsSystemHostname);

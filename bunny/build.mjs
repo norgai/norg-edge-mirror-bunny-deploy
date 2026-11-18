@@ -37,7 +37,7 @@ const outfile = join(here, "dist", "edge-router-bunny.js");
 const ALLOWED_IMPORT = "@bunny.net/edgescript-sdk@";
 
 // Names that must NEVER appear in a bundle that ships into a customer's Bunny
-// account. Mirrors the deploy-time guard in content-craft's worker_source.py.
+// account. Mirrors NORG's deploy-time guard.
 const FORBIDDEN_NAMES = [
   "CRAWLER_EVENT_SECRET",
   "WORKER_AUTH_SECRET",

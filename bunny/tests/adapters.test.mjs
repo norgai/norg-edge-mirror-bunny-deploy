@@ -164,3 +164,16 @@ test("the installer spells the public-host header the way the router does", asyn
   assert.ok(match, "install.mjs must declare PUBLIC_HOST_HEADER_NAME");
   assert.equal(match[1].toLowerCase(), PUBLIC_HOST_HEADER);
 });
+
+// --- health probe ----------------------------------------------------------
+
+test("the health probe accepts only the exact site key", async () => {
+  const { __test_isHealthProbe: isProbe } = await import("../src/router.js");
+  const key = "nek_live_abcdefghijklmnop";
+  const withHeader = (v) => new Request("https://x.test/", { headers: { "x-norg-edge-check": v } });
+  assert.equal(isProbe(withHeader(key), { NORG_SITE_KEY: key }), true);
+  assert.equal(isProbe(withHeader(`${key}x`), { NORG_SITE_KEY: key }), false);
+  assert.equal(isProbe(withHeader(key.slice(0, -1)), { NORG_SITE_KEY: key }), false);
+  assert.equal(isProbe(withHeader("nek_live_abcdefghijklmnoq"), { NORG_SITE_KEY: key }), false);
+  assert.equal(isProbe(new Request("https://x.test/"), { NORG_SITE_KEY: key }), false);
+});

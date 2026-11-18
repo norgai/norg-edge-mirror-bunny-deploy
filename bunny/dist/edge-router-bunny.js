@@ -198,7 +198,7 @@ function isConfigured(env) {
 }
 
 // bunny/src/lib/config.js
-var EDGE_SCRIPT_VERSION = "0.2.2";
+var EDGE_SCRIPT_VERSION = "0.2.3";
 var ENV_NAMES = [
   "SITE_ID",
   "NORG_SITE_KEY",
@@ -1075,9 +1075,15 @@ function toVisitorRequest(originRequest, url) {
     headers: originRequest.headers
   });
 }
+function constantTimeEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 function isHealthProbe(request, env) {
   const probeKey = request.headers.get(HEALTH_CHECK_HEADER);
-  return Boolean(probeKey && env.NORG_SITE_KEY && probeKey === env.NORG_SITE_KEY);
+  return Boolean(probeKey && env.NORG_SITE_KEY && constantTimeEqual(probeKey, env.NORG_SITE_KEY));
 }
 function isPassthrough(request, url, env) {
   if (binding(env, "EDGE_DISABLED") === "true") return true;
